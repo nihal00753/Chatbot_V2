@@ -1,30 +1,119 @@
 import streamlit as st
-from backend import chatbot
-from langchain_core.messages import HumanMessage, AIMessage
+from backend import chatbot, retrieve_all_threads
+from langchain_core.messages import HumanMessage
 import uuid
 
 # **************************************** utility functions *************************
 
 def generate_thread_id():
-    return uuid.uuid4()
+    thread_id = uuid.uuid4()
+    return thread_id
 
 def reset_chat():
     thread_id = generate_thread_id()
     st.session_state['thread_id'] = thread_id
-    st.session_state['chat_threads'][thread_id] = "New Chat"
+    add_thread(thread_id)
     st.session_state['message_history'] = []
+
+def add_thread(thread_id):
+    if thread_id not in st.session_state['chat_threads']:
+        st.session_state['chat_threads'].append(thread_id)
+    if thread_id not in st.session_state['chat_titles']:
+        st.session_state['chat_titles'][thread_id] = "New Chat"
 
 def load_conversation(thread_id):
     state = chatbot.get_state(config={'configurable': {'thread_id': thread_id}})
+    # Check if messages key exists in state values, return empty list if not
     return state.values.get('messages', [])
 
-def get_chat_summary(messages):
-    """Generate a name from first user message"""
+def make_title(text):
+    """Turn a raw message into a short, single-line chat title."""
+    title = " ".join(text.strip().split())
+    if len(title) > 40:
+        title = title[:40].rstrip() + "..."
+    return title or "New Chat"
+
+def get_thread_title(thread_id):
+    """
+    Human-friendly name for a thread instead of showing the raw UUID.
+    Cached in session_state; derived from the first user message the
+    first time a thread's title is needed.
+    """
+    cached = st.session_state['chat_titles'].get(thread_id)
+    if cached and cached != "New Chat":
+        return cached
+
+    messages = load_conversation(thread_id)
     for msg in messages:
-        if isinstance(msg, HumanMessage):
-            summary = msg.content[:30].strip()
-            return summary + "..." if len(msg.content) > 30 else summary
+        if isinstance(msg, HumanMessage) and msg.content.strip():
+            title = make_title(msg.content)
+            st.session_state['chat_titles'][thread_id] = title
+            return title
+
+    st.session_state['chat_titles'][thread_id] = "New Chat"
     return "New Chat"
+
+
+# **************************************** Page config *********************************
+
+st.set_page_config(
+    page_title="LangGraph Chatbot",
+    page_icon="💬",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# Purely visual polish below — no features added or removed.
+st.markdown(
+    """
+    <style>
+    /* ---- Sidebar: dark, ChatGPT-style conversation list ---- */
+    section[data-testid="stSidebar"] {
+        background-color: #171717;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #ececec !important;
+    }
+    section[data-testid="stSidebar"] hr {
+        border-color: #333333;
+    }
+
+    /* Make every sidebar button look like a list row, left-aligned */
+    section[data-testid="stSidebar"] .stButton > button {
+        width: 100%;
+        text-align: left;
+        justify-content: flex-start;
+        background-color: transparent;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 4px;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background-color: #2a2b2e;
+        border-color: #3a3b3e;
+    }
+
+    /* New Chat button gets a bit more presence */
+    section[data-testid="stSidebar"] .stButton:first-of-type > button {
+        border: 1px solid #444444;
+        font-weight: 600;
+    }
+
+    /* ---- Main chat area ---- */
+    [data-testid="stChatMessage"] {
+        border-radius: 14px;
+        padding: 0.4rem 0.6rem;
+        margin-bottom: 0.4rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # **************************************** Session Setup ******************************
@@ -36,102 +125,88 @@ if 'thread_id' not in st.session_state:
     st.session_state['thread_id'] = generate_thread_id()
 
 if 'chat_threads' not in st.session_state:
-    st.session_state['chat_threads'] = {}
+    st.session_state['chat_threads'] = retrieve_all_threads()
 
-if st.session_state['thread_id'] not in st.session_state['chat_threads']:
-    st.session_state['chat_threads'][st.session_state['thread_id']] = "New Chat"
+if 'chat_titles' not in st.session_state:
+    st.session_state['chat_titles'] = {}
 
-
-# **************************************** Page Config & Styling **************************
-
-st.set_page_config(page_title="LangGraph Chatbot", page_icon="💬", layout="wide")
-
-st.markdown("""
-<style>
-    .stChatMessage { padding: 12px 0 !important; }
-    .stChatMessage[data-testid="chat-message-user"] { 
-        background: rgba(0, 102, 204, 0.05) !important;
-        border-left: 3px solid #0066cc;
-        padding-left: 16px !important;
-    }
-    .stChatMessage[data-testid="chat-message-assistant"] { 
-        background: rgba(255, 165, 0, 0.04) !important;
-        border-left: 3px solid #ff9500;
-        padding-left: 16px !important;
-    }
-    .stText { font-size: 15px; line-height: 1.6; }
-    .empty-state { text-align: center; padding: 60px 20px; color: #666; }
-</style>
-""", unsafe_allow_html=True)
+add_thread(st.session_state['thread_id'])
 
 
 # **************************************** Sidebar UI *********************************
 
 with st.sidebar:
-    st.markdown("### 💬 Chat")
-    
-    if st.button("➕ New Chat", use_container_width=True):
+    st.markdown("### Chatbot")
+
+    if st.button("  New Chat", use_container_width=True):
         reset_chat()
         st.rerun()
-    
-    st.divider()
-    st.markdown("**Conversations**")
-    
-    for thread_id, name in sorted(st.session_state['chat_threads'].items(), key=lambda x: list(st.session_state['chat_threads'].keys()).index(x[0]), reverse=True):
-        if st.button(name, use_container_width=True, key=f"thread_{thread_id}"):
+
+    st.markdown("---")
+    st.caption("MY CONVERSATIONS")
+
+    for thread_id in st.session_state['chat_threads'][::-1]:
+        title = get_thread_title(thread_id)
+        is_active = thread_id == st.session_state['thread_id']
+        label = f" {title}" if is_active else f" {title}"
+
+        if st.button(label, key=f"thread_{thread_id}", use_container_width=True):
             st.session_state['thread_id'] = thread_id
             messages = load_conversation(thread_id)
-            
+
             temp_messages = []
+
             for msg in messages:
-                role = 'user' if isinstance(msg, HumanMessage) else 'assistant'
+                if isinstance(msg, HumanMessage):
+                    role = 'user'
+                else:
+                    role = 'assistant'
                 temp_messages.append({'role': role, 'content': msg.content})
-            
+
             st.session_state['message_history'] = temp_messages
             st.rerun()
 
 
 # **************************************** Main UI ************************************
 
-st.markdown("### Chat")
+st.subheader(get_thread_title(st.session_state['thread_id']))
 
-if not st.session_state['message_history']:
-    st.markdown("""
-    <div class="empty-state">
-        <div style="font-size: 48px; margin-bottom: 16px;">💭</div>
-        <p><strong>Start a conversation</strong></p>
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    for message in st.session_state['message_history']:
-        with st.chat_message(message['role'], avatar="👤" if message['role'] == "user" else "🤖"):
-            st.text(message['content'])
 
-user_input = st.chat_input("Type a message...")
+# loading the conversation history
+for message in st.session_state['message_history']:
+    with st.chat_message(message['role']):
+        st.text(message['content'])
+
+user_input = st.chat_input('Type here')
 
 if user_input:
+
+    # first add the message to message_history
     st.session_state['message_history'].append({'role': 'user', 'content': user_input})
-    
-    # Update chat name from first message
-    if st.session_state['chat_threads'][st.session_state['thread_id']] == "New Chat":
-        st.session_state['chat_threads'][st.session_state['thread_id']] = get_chat_summary([HumanMessage(content=user_input)])
-    
-    with st.chat_message("user", avatar="👤"):
+    with st.chat_message('user'):
         st.text(user_input)
-    
-    CONFIG = {'configurable': {'thread_id': st.session_state['thread_id']}}
-    
-    with st.chat_message("assistant", avatar="🤖"):
-        def ai_only_stream():
-            for message_chunk, metadata in chatbot.stream(
-                {"messages": [HumanMessage(content=user_input)]},
+
+    # name the thread from its first message, same convention used for reloaded threads
+    if st.session_state['chat_titles'].get(st.session_state['thread_id'], "New Chat") == "New Chat":
+        st.session_state['chat_titles'][st.session_state['thread_id']] = make_title(user_input)
+
+    CONFIG = {
+        "configurable": {"thread_id": st.session_state["thread_id"]},
+        "metadata": {
+            "thread_id": st.session_state["thread_id"]
+        },
+        "run_name": "chat_turn",
+    }
+
+    # first add the message to message_history
+    with st.chat_message('assistant'):
+
+        ai_message = st.write_stream(
+            message_chunk.content for message_chunk, metadata in chatbot.stream(
+                {'messages': [HumanMessage(content=user_input)]},
                 config=CONFIG,
-                stream_mode="messages"
-            ):
-                if isinstance(message_chunk, AIMessage):
-                    yield message_chunk.content
-        
-        ai_message = st.write_stream(ai_only_stream())
-    
+                stream_mode='messages'
+            )
+        )
+
     st.session_state['message_history'].append({'role': 'assistant', 'content': ai_message})
-    st.rerun()
