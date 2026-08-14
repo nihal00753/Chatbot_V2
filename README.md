@@ -1,329 +1,138 @@
-# Chatbot V2
+<div align="center">
 
-[![Python](https://img.shields.io/badge/python-3.9+-blue)](https://www.python.org)
-[![LangGraph](https://img.shields.io/badge/langgraph-latest-green)](https://langchain-ai.github.io/langgraph/)
-[![Streamlit](https://img.shields.io/badge/streamlit-latest-red)](https://streamlit.io)
-[![OpenRouter](https://img.shields.io/badge/openrouter-free-orange)](https://openrouter.ai)
+# Chatbot_V2
 
-A production-ready conversational AI chatbot that demonstrates modern LLM application architecture. Built with LangGraph for conversation state management, Streamlit for the UI, and OpenRouter for cost-free LLM inference.
+### A stateful, streaming AI chat app powered by LangGraph, Streamlit & OpenRouter
 
-## What This Shows
+*Multi-conversation memory. Real-time token streaming. Zero-cost LLM inference.*
 
-This is a **working example** of building a real chatbot with:
-- ✅ Conversation memory that actually works
-- ✅ Multiple independent chat threads (like ChatGPT)
-- ✅ Real-time streaming responses (see words as they generate)
-- ✅ Production-grade state management
-- ✅ Zero LLM API costs using free models
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)](https://www.langchain.com/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-black?style=for-the-badge)](https://langchain-ai.github.io/langgraph/)
+[![OpenRouter](https://img.shields.io/badge/OpenRouter-Free%20LLMs-6C5CE7?style=for-the-badge)](https://openrouter.ai/)
 
-Perfect for portfolio projects, learning LLM architecture, or prototyping your own AI product.
+![GitHub last commit](https://img.shields.io/github/last-commit/nihal00753/Chatbot_V2?color=blue)
+![GitHub repo size](https://img.shields.io/github/repo-size/nihal00753/Chatbot_V2)
+![GitHub stars](https://img.shields.io/github/stars/nihal00753/Chatbot_V2?style=social)
+
+</div>
+
+---
+
+## Overview
+
+**Chatbot_V2** is a conversational AI application that goes beyond a single-turn chat wrapper. It models the conversation as a **compiled state graph** (via LangGraph) rather than a linear script, giving it a clean, extensible foundation for adding memory, tools, and multi-step reasoning down the line.
+
+The app supports **multiple independent conversation threads**, each with its own checkpointed message history, a **live token-streaming UI**, and runs entirely on **free-tier LLM inference** through OpenRouter — no paid API key required to get started.
+
+---
+
+## Key Features
+
+| | |
+|---|---|
+| **Graph-based conversation engine** | Built with LangGraph's `StateGraph`, defining the chat flow as `START → chat_node → END` — a foundation that's easy to extend with tools, branching, or RAG nodes. |
+| **Multi-thread chat sessions** | Every conversation gets a unique `uuid4` thread ID. Users can start new chats, switch between past ones from the sidebar, and pick up right where they left off. |
+| **Stateful persistence via checkpointing** | LangGraph's checkpointer captures each thread's full message history, so conversation state survives across turns and thread switches. |
+| **Real-time streaming responses** | Assistant replies are streamed token-by-token into the UI using `chatbot.stream(..., stream_mode="messages")` paired with Streamlit's `write_stream`. |
+| **Auto-generated chat titles** | The sidebar automatically names each conversation from its first user message — no manual labeling needed. |
+| **Zero-cost LLM inference** | Uses an OpenAI-compatible `ChatOpenAI` client pointed at OpenRouter's free auto-routed model (`openrouter/free`), so the app runs without a paid model subscription. |
+| **Clean separation of concerns** | `backend.py` owns the graph/LLM logic; `frontend.py` owns the UI — decoupled and independently testable. |
+| **Custom-styled chat UI** | Hand-tuned CSS for distinct user/assistant message bubbles instead of default Streamlit styling. |
+
+---
 
 ## How It Works
 
-### The Three Core Parts
-
-**1. Backend (LangGraph)**
-- Handles message history automatically
-- Maintains separate conversation threads
-- Streams tokens in real-time to the UI
-- Never loses context between messages
-
-**2. Frontend (Streamlit)**
-- Native chat interface with message bubbles
-- Conversation sidebar showing all past chats
-- Real-time token streaming display
-- One-click chat reset
-
-**3. LLM (OpenRouter)**
-- Free tier models (no credit card needed)
-- Auto-selects fastest available model
-- Supports real-time streaming
-
-### Architecture Flow
-
-```
-User Input → LangGraph Backend → LLM Model → Streamed Response
-    ↓
-   Saved in conversation thread
+```mermaid
+flowchart LR
+    U["User types a message"] --> UI["Streamlit Frontend"]
+    UI --> G["LangGraph StateGraph"]
+    G --> N["chat_node"]
+    N --> LLM["OpenRouter LLM\n(via ChatOpenAI)"]
+    LLM --> N
+    N --> CP[("Checkpointer\nper thread_id")]
+    N --> S["Streamed tokens"]
+    S --> UI
 ```
 
-## Quick Start
+1. The user sends a message in the Streamlit UI.
+2. The message is added to that thread's state (`messages`) and passed into the compiled LangGraph graph.
+3. The `chat_node` invokes the LLM (routed through OpenRouter) with the full message history.
+4. The checkpointer persists the updated state against the active `thread_id`, so switching chats reloads the correct history.
+5. The response is streamed back to the UI as it's generated, rather than waiting for the full reply.
 
-### 1. Clone & Setup
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Frontend / UI** | Streamlit |
+| **Orchestration** | LangGraph (`StateGraph`, checkpointing) |
+| **LLM Integration** | LangChain + `langchain-openai` |
+| **Model Provider** | OpenRouter (free-tier auto-routed model) |
+| **State Management** | Per-thread UUIDs + LangGraph checkpointer |
+| **Language** | Python 3.10+ |
+
+---
+
+## Getting Started
 
 ```bash
+# 1. Clone the repo
 git clone https://github.com/nihal00753/Chatbot_V2.git
 cd Chatbot_V2
 
+# 2. Create a virtual environment
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate   # Windows: venv\Scripts\activate
 
+# 3. Install dependencies
 pip install -r requirements.txt
-```
 
-### 2. Get Free API Key
+# 4. Add your OpenRouter API key
+echo "OPENROUTER_API_KEY=your_key_here" > .env
 
-1. Go to https://openrouter.ai (no credit card needed)
-2. Sign up with email or GitHub
-3. Copy your API key from dashboard
-
-### 3. Configure
-
-Create `.env` file in project root:
-```
-OPENROUTER_API_KEY=sk_free_your_key_here
-```
-
-### 4. Run
-
-```bash
+# 5. Run the app
 streamlit run frontend.py
 ```
 
-Opens at `http://localhost:8501`
+Get a free OpenRouter API key at [openrouter.ai](https://openrouter.ai/).
 
-## Features
-
-**Stateful Conversations**
-- Every message remembered automatically
-- Context carries across turns
-- No manual history management
-
-**Multiple Chat Threads**
-- Create new chats with one click
-- Switch between conversations without losing context
-- Each thread maintains its own message history
-
-**Real-Time Streaming**
-- See responses word-by-word as they generate
-- First token appears within 0.5-1 second
-- Better perceived performance (feels 3x faster than waiting)
-
-**Clean UI**
-- Native Streamlit chat interface
-- Message bubbles for user and assistant
-- Conversation history in sidebar
-- Works on mobile
+---
 
 ## Project Structure
 
 ```
 Chatbot_V2/
-├── backend.py           # LangGraph conversation engine
-├── frontend.py          # Streamlit UI
+├── backend.py         # LangGraph state graph, LLM client, checkpointing
+├── frontend.py         # Streamlit UI, session state, sidebar, streaming
 ├── requirements.txt     # Python dependencies
-├── .env.example         # Configuration template
-└── README.md            # This file
+└── .gitignore
 ```
-
-## Streaming Explained
-
-**Why streaming matters:**
-
-Without streaming: Wait 2-3 seconds → see full response
-With streaming: See first words in 0.5s → watch response appear live
-
-The technical approach:
-1. LangGraph's `stream()` method yields message chunks
-2. Streamlit's `st.write_stream()` displays each chunk instantly
-3. Full message saved to session state after completion
-
-```python
-# The streaming pipeline
-for message_chunk in chatbot.stream({'messages': [HumanMessage(...)]}):
-    yield message_chunk.content  # Each token appears immediately
-```
-
-## Configuration
-
-### Change the LLM Model
-
-Edit `backend.py` line 12:
-```python
-model="meta-llama/llama-2-7b-chat"  # Pick from OpenRouter models
-```
-
-Available models: https://openrouter.ai/docs
-
-### Add a System Prompt
-
-Edit `backend.py` `chat_node()` function:
-```python
-from langchain_core.messages import SystemMessage
-
-system = SystemMessage(content="You are a Python expert. Provide code examples.")
-response = llm.invoke([system, *messages])
-```
-
-## Deployment
-
-### Streamlit Cloud (Easiest - Free)
-
-1. Push code to GitHub
-2. Go to https://share.streamlit.io
-3. Create new app → select this repo and `frontend.py`
-4. In "Advanced settings" → Secrets, add:
-   ```
-   OPENROUTER_API_KEY = sk_free_your_key
-   ```
-5. Click Deploy! Auto-redeploys on every push
-
-### Docker
-
-```bash
-docker build -t chatbot .
-docker run -p 8501:8501 -e OPENROUTER_API_KEY=sk_free_xxx chatbot
-```
-
-### VPS (DigitalOcean, Linode, etc.)
-
-1. SSH into server
-2. Clone repo and create venv
-3. Create `.env` with API key
-4. Run with `streamlit run frontend.py`
-5. Use nginx to reverse proxy if desired
-
-## How It Works Under the Hood
-
-### Backend Architecture
-
-```python
-ChatState:
-  messages: [user_msg, assistant_msg, user_msg, ...]
-  
-chat_node:
-  Takes all messages from state
-  Sends to LLM
-  LLM responds
-  Response added to state automatically
-  
-Thread-based persistence:
-  Each chat has unique thread ID
-  LangGraph remembers all messages for that thread
-  Even if app restarts, conversation history is preserved
-```
-
-### Frontend Flow
-
-1. User types message
-2. Added to Streamlit session state
-3. Sent to LangGraph backend with thread ID
-4. Backend streams response back
-5. Each token displays immediately
-6. Final message saved to session state
-
-## Performance Metrics
-
-| Metric | Value |
-|--------|-------|
-| First token latency | 0.5-1s |
-| Total response time | 2-3s |
-| Memory usage | ~200MB |
-| Max concurrent chats | 100+ |
-
-## Common Customizations
-
-### Use Different Model
-
-```python
-# In backend.py
-llm = ChatOpenAI(
-    model="mistralai/mistral-7b-instruct"  # Faster, still free
-)
-```
-
-### Shorter Responses
-
-```python
-# In backend.py
-llm = ChatOpenAI(
-    max_tokens=512  # Default is 2048
-)
-```
-
-### Add Error Handling
-
-```python
-# In chat_node
-try:
-    response = llm.invoke(messages)
-except Exception as e:
-    return {"messages": [AIMessage(content=f"Error: {str(e)}")]}
-```
-
-## Troubleshooting
-
-**API key not found?**
-- Create `.env` file in project root (not in subdirectories)
-- Format: `OPENROUTER_API_KEY=sk_free_xxxxx` (no quotes)
-- Restart Streamlit after adding file
-
-**Streaming not working?**
-- Update Streamlit: `pip install --upgrade streamlit`
-- Requires Streamlit >= 1.28 for `st.write_stream()`
-
-**Conversations disappear on restart?**
-- Expected behavior (in-memory storage)
-- Add database backend for persistent storage
-
-**Rate limited?**
-- Free tier has daily usage limits
-- Check https://openrouter.ai/dashboard for remaining quota
-- Upgrade to paid tier or wait 24 hours
-
-## What Recruiters See
-
-This project demonstrates:
-
-| Skill | How It Shows |
-|-------|-------------|
-| **LLM Architecture** | State management, threading, streaming |
-| **System Design** | Clean separation of concerns, error handling |
-| **Production Thinking** | Configuration management, scalability |
-| **Python Expertise** | Type hints, generators, async patterns |
-| **Full-Stack** | Backend logic + frontend UI + deployment |
-
-### Interview Talking Points
-
-1. **"Why thread-based conversations?"**
-   - Isolates context per user, scales automatically, LangGraph handles persistence
-
-2. **"Why real-time streaming?"**
-   - First token in 0.5s vs 3s total wait, better UX especially mobile, perceived 3x faster
-
-3. **"How would you add persistence?"**
-   - Replace InMemorySaver with PostgreSQL, add schema for messages, implement retrieval
-
-4. **"What about multi-user?"**
-   - Generate unique thread_id per user, add authentication, tie sessions to user_id
-
-## Learning Resources
-
-- **LangGraph Docs** — https://langchain-ai.github.io/langgraph/
-- **Streamlit Docs** — https://docs.streamlit.io/
-- **OpenRouter Models** — https://openrouter.ai/docs
-- **LangChain** — https://python.langchain.com
-
-## Next Steps
-
-After getting it working locally:
-
-1. Deploy to Streamlit Cloud (free, auto-deploys on push)
-2. Customize the system prompt for your use case
-3. Add error handling for production
-4. Consider adding persistent storage (database)
-5. Explore adding tools (calculator, search, etc.)
-
-## Limitations
-
-- Free tier has rate limits (check OpenRouter dashboard)
-- In-memory storage clears on app restart
-- Conversations not shared between users
-
-## License
-
-MIT License - Use freely in projects
 
 ---
 
-Built to learn. Ready to ship. 🚀
+## What This Project Demonstrates
+
+- Designing LLM applications as **graphs**, not just linear prompt chains — a pattern that scales cleanly to tool-calling, RAG, and multi-agent workflows.
+- Managing **multi-session conversational state** with checkpointing, rather than relying on a single in-memory list.
+- Building a **reactive, streaming UI** on top of a backend generator/stream interface.
+- Integrating a third-party, OpenAI-compatible **LLM gateway** (OpenRouter) instead of hardcoding a single vendor's SDK.
+
+---
+
+## Roadmap
+
+- [ ] Move from in-memory checkpointing to durable **SQLite/Postgres** persistence across restarts
+- [ ] Add tool-calling / RAG nodes to the graph
+- [ ] User authentication for multi-user deployments
+- [ ] Deploy to Streamlit Community Cloud / Docker
+
+---
+
+## Connect
+
+Built by [**@nihal00753**](https://github.com/nihal00753) — feel free to open an issue or connect on GitHub.
