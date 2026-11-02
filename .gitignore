@@ -49,3 +49,8 @@ logs/
 # Cache
 .cache/
 *.cache
+
+#database
+chatbot.db 
+chatbot.db-shm
+chatbot.db-wal
