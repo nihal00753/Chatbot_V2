@@ -1,156 +1,130 @@
-<div align="center">
-
 # Chatbot_V2
 
-### A stateful, tool-calling AI chat app powered by LangGraph, Streamlit & Groq
+**A stateful, multi-utility AI assistant featuring PDF RAG, local embeddings, autonomous tool calling, and SQLite conversation persistence — powered by LangGraph, Streamlit & Groq.**
 
-*Multi-conversation memory. Real-time token streaming. Tool calling & MCP integration. Durable SQLite persistence.*
-
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)](https://www.langchain.com/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-black?style=for-the-badge)](https://langchain-ai.github.io/langgraph/)
-[![Groq](https://img.shields.io/badge/Groq-Fast%20LLM%20Inference-F55036?style=for-the-badge)](https://groq.com/)
-[![MCP](https://img.shields.io/badge/MCP-Tool%20Servers-4A90D9?style=for-the-badge)](https://modelcontextprotocol.io/)
-
-![GitHub last commit](https://img.shields.io/github/last-commit/nihal00753/Chatbot_V2?color=blue)
-![GitHub repo size](https://img.shields.io/github/repo-size/nihal00753/Chatbot_V2)
-![GitHub stars](https://img.shields.io/github/stars/nihal00753/Chatbot_V2?style=social)
-
+<div align="center">
+  <a href="https://github.com/nihal00753/Chatbot_V2"><img src="https://img.shields.io/github/stars/nihal00753/Chatbot_V2?style=social" alt="GitHub stars"/></a>
+  <a href="https://github.com/nihal00753/Chatbot_V2"><img src="https://img.shields.io/github/last-commit/nihal00753/Chatbot_V2?color=blue" alt="Last commit"/></a>
+  <a href="https://github.com/nihal00753/Chatbot_V2"><img src="https://img.shields.io/github/repo-size/nihal00753/Chatbot_V2" alt="Repo size"/></a>
 </div>
 
 ---
 
-## Overview
+## 📖 Overview
 
-**Chatbot_V2** is a conversational AI application that goes beyond a single-turn chat wrapper. It models the conversation as a **compiled state graph** (via LangGraph) with **conditional tool-calling edges**, giving it a clean, extensible foundation for web search, live data lookups, and external MCP tool servers.
+**Chatbot_V2** is a modular conversational AI application built on a compiled state graph (via **LangGraph**). Instead of running a linear chat loop, it models user interactions as an autonomous decision graph capable of calling external tools, searching the web, executing calculations, retrieving live stock prices, and performing semantic search (**RAG**) over user-uploaded PDF documents.
 
-The app supports **multiple independent conversation threads** with **durable SQLite-backed checkpointing** (conversation state persists across restarts), a **live token-streaming UI** with inline tool-status indicators, and runs on **Groq's high-speed LLM inference** using the `openai/gpt-oss-120b` model.
+Conversation history is durably persisted in SQLite, allowing users to start, switch, and resume independent chat sessions seamlessly.
 
 ---
 
-## Key Features
+## 🚀 Key Features
 
-| | |
+| Feature | Description |
 |---|---|
-| **Graph-based conversation engine with tool calling** | Built with LangGraph's `StateGraph`, defining the chat flow as `START → chat_node → (tools_condition) → tools → chat_node → END` — the LLM autonomously decides when to call tools and loops back for multi-step reasoning. |
-| **Built-in tools** | **DuckDuckGo web search** for real-time information retrieval and a **stock price lookup** (via Alpha Vantage) for live market data — both bound to the LLM via LangChain's tool-calling interface. |
-| **MCP server integration** | Connects to external **Model Context Protocol (MCP)** tool servers (stdio and streamable-HTTP transports) via `langchain-mcp-adapters`, making it easy to plug in additional capabilities without modifying the core graph. |
-| **Multi-thread chat sessions** | Every conversation gets a unique `uuid4` thread ID. Users can start new chats, switch between past ones from the sidebar, and pick up right where they left off. |
-| **Durable SQLite persistence** | LangGraph's `AsyncSqliteSaver` checkpointer stores each thread's full message history in a local `chatbot.db` file, so conversation state survives across app restarts — not just across turns. |
-| **Real-time streaming responses** | Assistant replies are streamed token-by-token into the UI using `chatbot.astream(..., stream_mode="messages")` bridged to Streamlit's `write_stream` via a dedicated async event loop and queue. |
-| **Inline tool-status UI** | When the LLM invokes a tool, an expandable status widget (🔧 *Using `tool_name` …*) appears in the chat, updating in real time and collapsing to ✅ *Tool finished* on completion. |
-| **Auto-generated chat titles** | The sidebar automatically names each conversation from its first user message — no manual labeling needed. |
-| **Async bridge architecture** | A dedicated background `asyncio` event loop (on a daemon thread) bridges Streamlit's synchronous runtime with LangGraph's fully async graph execution and streaming. |
-| **Clean separation of concerns** | `backend.py` owns the graph, tools, LLM, and checkpointing logic; `frontend.py` owns the UI — decoupled and independently testable. |
+| **Graph-Based Conversation Engine** | Built with LangGraph's `StateGraph`, cycling through `chat_node → tools_condition → ToolNode → chat_node` until a complete answer is formed. |
+| **PDF RAG (Retrieval-Augmented Generation)** | Upload PDFs directly from the sidebar. The document is chunked, embedded, and indexed per-thread in an in-memory `FAISS` vector store. |
+| **100% Free Local Embeddings** | Uses `sentence-transformers/all-MiniLM-L6-v2` via `langchain-huggingface` to embed documents locally on CPU with zero API costs and no external API keys required. |
+| **Autonomous Tool Calling** | The LLM dynamically decides when to query the PDF (`rag_tool`), perform a web search, calculate math, or look up stock quotes. |
+| **Built-in Toolset** | <ul><li>**PDF Retriever (`rag_tool`)**: Contextual search across indexed document chunks.</li><li>**Web Search**: Real-time DuckDuckGo search integration.</li><li>**Stock Price Lookup**: Live quotes via Alpha Vantage API.</li><li>**Calculator**: Accurate arithmetic operations (`add`, `sub`, `mul`, `div`).</li></ul> |
+| **Multi-Thread Chat Sessions** | Each conversation has a unique ID. Users can spin up new threads, switch between past conversations, and view active thread badges in the sidebar. |
+| **Durable SQLite Checkpointing** | LangGraph's `SqliteSaver` captures state snapshots after each turn into `chatbot.db`, surviving app restarts. |
+| **Real-Time Token Streaming & Tool Indicators** | Answers stream token-by-token with Streamlit's `write_stream`, alongside inline progress containers (`st.status`) that expand when tools execute. |
+| **Fast Startup via Lazy Loading** | Heavy C++ extensions and machine learning libraries (PyTorch, FAISS, Text Splitters) are loaded on-demand, enabling sub-4 second app boot times. |
 
 ---
 
-## How It Works
+## 🧠 LangGraph Workflow Architecture
 
 ```mermaid
 flowchart LR
-    U["User types a message"] --> UI["Streamlit Frontend"]
-    UI --> Q["Async Queue Bridge"]
-    Q --> G["LangGraph StateGraph"]
-    G --> N["chat_node"]
-    N --> LLM["Groq LLM\n(openai/gpt-oss-120b)"]
-    LLM --> N
-    N -->|"tools_condition"| T["ToolNode\n(Search / Stock / MCP)"]
-    T --> N
-    N --> CP[("SQLite Checkpointer\nchatbot.db\nper thread_id")]
-    N --> S["Streamed tokens"]
-    S --> UI
+    START([START]) --> chat_node["🤖 chat_node (Groq LLM)"]
+    chat_node --> condition{"tools_condition"}
+    condition -- "Tool Call Requested" --> tools["🔧 ToolNode (RAG, Web, Stock, Calc)"]
+    tools --> chat_node
+    condition -- "Final Answer" --> END([END])
 ```
-
-1. The user sends a message in the Streamlit UI.
-2. The message is added to that thread's state (`messages`) and dispatched to the compiled LangGraph graph via an async queue bridge.
-3. The `chat_node` invokes the LLM (hosted on Groq) with the full message history and available tool definitions.
-4. If the LLM requests a tool call, `tools_condition` routes to the `ToolNode`, which executes the tool (DuckDuckGo search, stock price lookup, or an MCP server tool) and loops back to `chat_node` for the LLM to interpret the result.
-5. The `AsyncSqliteSaver` checkpointer persists the updated state to `chatbot.db` against the active `thread_id`, so conversations survive restarts and thread switches.
-6. The response is streamed back to the UI token-by-token as it's generated, with tool invocations shown inline via status widgets.
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Technology |
 |---|---|
 | **Frontend / UI** | Streamlit |
-| **Orchestration** | LangGraph (`StateGraph`, conditional edges, checkpointing) |
-| **LLM Integration** | LangChain + `langchain-openai` (OpenAI-compatible client) |
-| **Model Provider** | Groq (`openai/gpt-oss-120b` via `api.groq.com`) |
-| **Tool Calling** | LangGraph `ToolNode` + `tools_condition` (conditional routing) |
-| **Built-in Tools** | DuckDuckGo Search (`langchain-community`), Alpha Vantage Stock Price |
-| **External Tools** | MCP servers via `langchain-mcp-adapters` (stdio & streamable-HTTP) |
-| **State Persistence** | SQLite via `AsyncSqliteSaver` + `aiosqlite` (`chatbot.db`) |
-| **Async Runtime** | Dedicated `asyncio` event loop on a daemon thread |
-| **Language** | Python 3.10+ |
+| **Orchestration** | LangGraph (`StateGraph`, conditional edges, `ToolNode`, `SqliteSaver`) |
+| **LLM Provider** | Groq (`openai/gpt-oss-120b` via `langchain-openai`) |
+| **Embeddings** | Hugging Face (`sentence-transformers/all-MiniLM-L6-v2` via `langchain-huggingface`) |
+| **Vector Store** | FAISS (`faiss-cpu`) |
+| **Document Processing** | `pypdf`, `langchain-text-splitters` (`RecursiveCharacterTextSplitter`) |
+| **Tools & APIs** | DuckDuckGo Search, Alpha Vantage API, Custom Calculator |
+| **Database & Persistence** | SQLite (`chatbot.db`) |
+| **Language & Environment** | Python 3.10+ |
 
 ---
 
-## Getting Started
+## 📦 Getting Started
 
+### 1️⃣ Clone the Repository
 ```bash
-# 1. Clone the repo
 git clone https://github.com/nihal00753/Chatbot_V2.git
 cd Chatbot_V2
-
-# 2. Create a virtual environment
-python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Add your Groq API key
-echo "GROQ_API_KEY=your_key_here" > .env
-
-# 5. Run the app
-streamlit run frontend.py
 ```
 
-Get a free Groq API key at [console.groq.com](https://console.groq.com/).
+### 2️⃣ Create & Activate Virtual Environment
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# macOS / Linux
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3️⃣ Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4️⃣ Configure Environment Variables
+Create a `.env` file in the project root:
+```env
+GROQ_API_KEY=your_groq_api_key_here
+```
+> **Tip:** You can obtain a free Groq API key from the [Groq Console](https://console.groq.com/).
+
+### 5️⃣ Run the Application
+```bash
+streamlit run frontend.py
+```
+Open your browser at **`http://localhost:8501`**.
 
 ---
 
-## Project Structure
+## 📂 Project Structure
 
 ```
 Chatbot_V2/
-├── backend.py          # LangGraph state graph, LLM client, tools, MCP integration, checkpointing
-├── frontend.py          # Streamlit UI, session state, sidebar, streaming, tool-status widgets
-├── chatbot.db           # SQLite database for durable conversation persistence (auto-created)
-├── requirements.txt     # Python dependencies
-└── .gitignore
+├── backend.py          # State graph definition, LLM, tools, RAG pipeline, SQLite checkpointer
+├── frontend.py         # Streamlit UI, sidebar thread manager, PDF uploader, streaming chat
+├── chatbot.db          # SQLite database storing multi-thread checkpoints (auto-created)
+├── requirements.txt    # Python dependencies (LangGraph, Streamlit, FAISS, PyPDF, etc.)
+├── .env                # Environment keys (ignored by git)
+├── .gitignore          # Git exclusion rules
+└── README.md           # Documentation
 ```
 
 ---
 
-## What This Project Demonstrates
+## 💡 Usage Guide
 
-- Designing LLM applications as **graphs with conditional tool-calling edges**, not just linear prompt chains — a pattern that scales cleanly to multi-step reasoning and agent loops.
-- **Autonomous tool selection** by the LLM: the model decides when to search the web, fetch stock prices, or invoke MCP tools, and the graph loops until it has a final answer.
-- Integrating **external tool servers via the Model Context Protocol (MCP)**, showing how to extend an agent's capabilities without modifying its core graph logic.
-- **Durable multi-session conversational state** with SQLite-backed checkpointing, surviving not just turn switches but full application restarts.
-- Bridging **Streamlit's synchronous runtime with fully async LangGraph execution** using a dedicated event loop on a daemon thread and a queue-based streaming bridge.
-- Building a **reactive, streaming UI** with inline tool-status indicators on top of a backend async generator interface.
-- Integrating a third-party, OpenAI-compatible **LLM gateway** (Groq) instead of hardcoding a single vendor's SDK.
-
----
-
-## Roadmap
-
-- [x] ~~Move from in-memory checkpointing to durable **SQLite** persistence across restarts~~
-- [x] ~~Add tool-calling nodes to the graph~~
-- [x] ~~Integrate MCP tool servers~~
-- [ ] User authentication for multi-user deployments
-- [ ] RAG (Retrieval-Augmented Generation) node for document Q&A
-- [ ] Deploy to Streamlit Community Cloud / Docker
-- [ ] Conversation title generation from first message content
-
----
-
-## Connect
-
-Built by [**@nihal00753**](https://github.com/nihal00753) — feel free to open an issue or connect on GitHub.
+1. **New Chat**: Click **➕ New Chat** in the sidebar to generate a fresh thread.
+2. **PDF RAG**:
+   - In the sidebar, upload any `.pdf` document under **Upload a PDF for this chat**.
+   - The app chunks the text, creates vector embeddings, and builds a per-thread FAISS index.
+   - Ask any question regarding the document; the LLM will automatically call `rag_tool` with your thread ID to cite context.
+3. **Web Search & Stocks**:
+   - Ask questions like *"What is the latest news about NASA Artemis?"* or *"What is the current stock price of TSLA?"*.
+4. **Switching Conversations**:
+   - Select any historical thread from the **Past conversations** section in the sidebar to resume prior discussions and review earlier messages.
